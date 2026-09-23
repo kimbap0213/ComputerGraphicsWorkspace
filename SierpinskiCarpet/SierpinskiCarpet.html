@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+        <title>Sierpinski Carpet</title>
+        <script id="vertex-shader" type="x-shader/x-vertex">
+            attribute vec4 vPosition;
+            uniform vec4 backgroundColor;
+            uniform vec4 carpetColor;
+            varying vec4 fColor;
+
+            void main() {
+                fColor = mix(backgroundColor, carpetColor, vPosition.z);
+                gl_Position = vPosition;
+            }
+        </script>
+        <script id="fragment-shader" type="x-shader/x-fragment">
+            precision mediump float;
+            varying vec4 fColor;
+
+            void main() {
+                gl_FragColor = fColor;
+            }
+        </script>
+        <script type="text/javascript" src="../Common/webgl-utils.js"></script>
+        <script type="text/javascript" src="../Common/initShaders.js"></script>
+        <script type="text/javascript" src="../Common/MV.js"></script>
+        <script type="text/javascript" src="SierpinskiCarpet.js"></script>
+    </head>
+    <body>
+        <canvas id="gl-canvas" width="512" height="512">
+            Oops ... your browser doesn't support the HTML5 canvas element
+        </canvas>
+        <div id="recursionCountText">
+            Recursion 1
+        </div>
+        <div>
+            1
+            <input id="slide" type="range" min="1" max="5" step="1" value="1"/>
+            5
+        </div>
+        <div>
+            Background Color
+            <input id="backgroundColor" type="color" value="#FFFFFF"/>
+        </div>
+        <div>
+            Carpet Color
+            <input id="carpetColor" type="color" value="#000000"/>
+        </div>
+    </body>
+</html>
