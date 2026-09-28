@@ -119,26 +119,28 @@ function generateOffsetVector(vector, offsetX, offsetY) {
 }
 
 function setBackgroundSquare(pos, sideLength) {
-    square(pos, sideLength, 0)
+    square(pos, sideLength, 1)
 }
 
 function divideSquare(pos, sideLength, count) {
 
     console.log("Divide Position" + pos + "\nSideLength: " + sideLength + "\nCount: " + count);
 
-    if (count == 0) {
-        square(pos, sideLength, 1);
-    }
-    else {
-
+    if (count > 0) {
+        
         count--;
+        let newSideLength = sideLength / 3.0;
 
         for (let i = 0; i < 3; i++) {
             for (let j = 0; j < 3; j++) {
 
-                if (i == 1 && j == 1) { continue; }
+                let newPosition = generateOffsetVector(pos, sideLength * (i / 3.0), sideLength * (j / 3.0));
 
-                divideSquare(generateOffsetVector(pos, sideLength * (i / 3.0), sideLength * (j / 3.0)), sideLength / 3.0, count);
+                if (i == 1 && j == 1) {
+                    square(newPosition, newSideLength, 0);
+                }
+
+                divideSquare(newPosition, newSideLength, count);
             }
         }
     }
