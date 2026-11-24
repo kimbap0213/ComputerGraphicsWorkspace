@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+        <title>Earth Simulator</title>
+        <script id="vertex-shader" type="x-shader/x-vertex">
+            attribute vec4 vPosition;
+            attribute vec4 vNormal;
+
+            uniform mat4 modelViewMatrix;
+            uniform mat4 projectionMatrix;
+
+            varying vec4 fPosition;
+            varying vec4 fNormal;
+
+            void main() {
+                gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+                fPosition = vPosition;
+                fNormal = vNormal;
+            }
+        </script>
+        <script id="fragment-shader" type="x-shader/x-fragment">
+            precision mediump float;
+            
+            uniform vec4 waterAmbientProduct;
+            uniform vec4 waterDiffuseProduct;
+            uniform vec4 waterSpecularProduct;
+            uniform float waterShininess;
+
+            uniform vec4 groundAmbientProduct;
+            uniform vec4 groundDiffuseProduct;
+            uniform vec4 groundSpecularProduct;
+            uniform float groundShininess;
+
+            uniform mat3 normalMatrix;
+
+            uniform vec4 lightPosition;
+            uniform vec3 eyePosition;
+
+            uniform sampler2D height;
+
+            varying vec4 fPosition;
+            varying vec4 fNormal;
+
+            float get_height_texture(vec2 uv) {
+                return 1.0 - texture2D(height, uv).x * 2.0;
+            }
+
+            float mod_1(float a) {
+                return a > 1.0 ? a - 1.0 : (a < 0.0 ? a + 1.0 : a);
+            }
+
+            float get_gap(vec2 position, float vertex_gap, float horizontal_gap) {
+                float x1 = mod_1(position.x);
+                float y1 = mod_1(position.y);
+                float x2 = mod_1(position.x - horizontal_gap);
+                float y2 = mod_1(position.y - vertex_gap);
+
+                return get_height_texture(vec2(x1, y1)) - get_height_texture(vec2(x2, y2));
+            }
+
+            vec3 get_normal(vec3 position, vec3 normal) {
+                float deg = degrees(atan(position.z, position.x));
+                float scale = 100.0;
+                float gap = 0.0001;
+                deg = (deg + 180.0) / 360.0;
+                vec2 uv = vec2(deg, (position.y + 1.0) / 2.0);
+                float vg = get_gap(uv, gap, 0.0) * scale;
+                float hg = get_gap(uv, 0.0, gap) * scale;
+                normal = normal + vec3(-normal.z, 0.0, normal.x) * hg;
+                normal.y += normal.y * vg;
+                return normalize(normal);
+            }
+
+            float get_height(vec3 position) {
+                float deg = degrees(atan(position.z, position.x));
+                deg = (deg + 180.0) / 360.0;
+                vec2 uv = vec2(deg, (position.y + 1.0) / 2.0);
+                return get_height_texture(uv);
+            }
+
+            void main() {
+                float h = get_height(fPosition.xyz);
+                vec4 pos = fPosition + fPosition * h * 0.25;
+                vec3 L = normalize((lightPosition.w == 0.0 ? lightPosition : lightPosition - pos).xyz);
+                vec3 E = normalize(eyePosition);
+                vec3 H = normalize(L + E);
+                vec3 N = get_normal(pos.xyz, fNormal.xyz);
+
+                vec4 ambient = h > -0.1 ? groundAmbientProduct : waterAmbientProduct;
+                vec4 diffuse = max(dot(L, N), 0.0) * (h > -0.1 ? groundDiffuseProduct : waterDiffuseProduct);
+                vec4 specular = dot(L, N) < 0.0 ? vec4(0.0, 0.0, 0.0, 1.0) : pow(max(dot(N, H), 0.0), h > -0.1 ? groundShininess : waterShininess)
+                * (h > -0.1 ? groundSpecularProduct : waterSpecularProduct);
+
+                vec4 fColor = ambient + diffuse + specular;
+                fColor.a = 1.0;
+
+                gl_FragColor = fColor;
+            }
+        </script>
+        <script type="text/javascript" src="../Common/webgl-utils.js"></script>
+        <script type="text/javascript" src="../Common/initShaders.js"></script>
+        <script type="text/javascript" src="../Common/MV.js"></script>
+        <script type="text/javascript" src="Earth.js"></script>
+    </head>
+    <body>
+        <canvas id="gl-canvas" width="1024" height="1024
+        ">
+            Oops ... your browser doesn't support the HTML5 canvas element
+        </canvas>
+        <img id="heightMap" src="height_map.png" hidden>
+    </body>
+</html>
