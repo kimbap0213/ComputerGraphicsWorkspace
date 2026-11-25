@@ -10,11 +10,39 @@
             uniform mat4 modelViewMatrix;
             uniform mat4 projectionMatrix;
 
+            uniform sampler2D height;
+            uniform float heightScale;
+
             varying vec4 fPosition;
             varying vec4 fNormal;
 
+            float mod_1(float a) {
+                return a >= 1.0 ? a - 1.0 : (a <= 0.0 ? a + 1.0 : a);
+            }
+
+            float clamp_01(float a) {
+                return a > 1.0 ? 1.0 : (a < 0.0 ? 0.0 : a);
+            }
+
+            float get_height_texture(vec2 uv) {
+                return 1.0 - texture2D(height, uv).x * 2.0;
+            }
+            
+            vec2 position_to_uv(vec3 position) {
+                float horizontal_deg = mod_1(1.0 - ((degrees(atan(position.z, position.x)) + 180.0) / 360.0));
+                float vertical_deg = clamp_01((degrees(asin(position.y)) + 90.0) / 180.0);
+                return vec2(horizontal_deg, vertical_deg);
+            }
+
+            float get_height(vec3 position) {
+                vec2 uv = position_to_uv(position);
+                return get_height_texture(uv);
+            }
+
             void main() {
-                gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+                vec4 position = vPosition * (1.0 + get_height(vPosition.xyz) * heightScale);
+                position.w = 1.0;
+                gl_Position = projectionMatrix * modelViewMatrix * position;
                 fPosition = vPosition;
                 fNormal = vNormal;
             }
@@ -22,77 +50,111 @@
         <script id="fragment-shader" type="x-shader/x-fragment">
             precision mediump float;
             
-            uniform vec4 waterAmbientProduct;
             uniform vec4 waterDiffuseProduct;
             uniform vec4 waterSpecularProduct;
             uniform float waterShininess;
 
-            uniform vec4 groundAmbientProduct;
             uniform vec4 groundDiffuseProduct;
             uniform vec4 groundSpecularProduct;
             uniform float groundShininess;
 
+            uniform vec4 snowDiffuseProduct;
+            uniform vec4 snowSpecularProduct;
+            uniform float snowShininess;
+
             uniform mat3 normalMatrix;
 
-            uniform vec4 lightPosition;
+            uniform vec3 lightPosition;
             uniform vec3 eyePosition;
 
             uniform sampler2D height;
+            uniform float applyNormal;
 
             varying vec4 fPosition;
             varying vec4 fNormal;
 
-            float get_height_texture(vec2 uv) {
-                return 1.0 - texture2D(height, uv).x * 2.0;
-            }
-
             float mod_1(float a) {
-                return a > 1.0 ? a - 1.0 : (a < 0.0 ? a + 1.0 : a);
+                return a >= 1.0 ? a - 1.0 : (a < 0.0 ? a + 1.0 : a);
             }
 
-            float get_gap(vec2 position, float vertex_gap, float horizontal_gap) {
-                float x1 = mod_1(position.x);
-                float y1 = mod_1(position.y);
-                float x2 = mod_1(position.x - horizontal_gap);
-                float y2 = mod_1(position.y - vertex_gap);
-
-                return get_height_texture(vec2(x1, y1)) - get_height_texture(vec2(x2, y2));
+            float clamp_01(float a) {
+                return a > 1.0 ? 1.0 : (a < 0.0 ? 0.0 : a);
             }
 
-            vec3 get_normal(vec3 position, vec3 normal) {
-                float deg = degrees(atan(position.z, position.x));
-                float scale = 100.0;
-                float gap = 0.0001;
-                deg = (deg + 180.0) / 360.0;
-                vec2 uv = vec2(deg, (position.y + 1.0) / 2.0);
-                float vg = get_gap(uv, gap, 0.0) * scale;
-                float hg = get_gap(uv, 0.0, gap) * scale;
-                normal = normal + vec3(-normal.z, 0.0, normal.x) * hg;
-                normal.y += normal.y * vg;
-                return normalize(normal);
+            float get_height_texture(vec2 uv) {
+                return 1.0 - texture2D(height, uv).r * 2.0;
+            }
+            
+            vec2 position_to_uv(vec3 position) {
+                float horizontal_deg = mod_1(1.0 - ((degrees(atan(position.z, position.x)) + 180.0) / 360.0));
+                float vertical_deg = clamp_01((degrees(asin(position.y)) + 90.0) / 180.0);
+                return vec2(horizontal_deg, vertical_deg);
             }
 
             float get_height(vec3 position) {
-                float deg = degrees(atan(position.z, position.x));
-                deg = (deg + 180.0) / 360.0;
-                vec2 uv = vec2(deg, (position.y + 1.0) / 2.0);
+                vec2 uv = position_to_uv(position);
                 return get_height_texture(uv);
             }
 
+            vec2 get_gap(vec2 uv, float vertical_gap, float horizontal_gap) {
+                float origin = get_height_texture(uv);
+                float vertical = get_height_texture(vec2(uv.x, clamp_01(uv.y - vertical_gap)));
+                float horizontal = get_height_texture(vec2(mod_1(uv.x - horizontal_gap), uv.y));
+                return vec2(origin - horizontal, origin - vertical);
+            }
+
+            vec3 get_modified_normal(vec3 position, vec3 normal) {
+                float gap = 3.0 / 4096.0;
+                vec2 uv = position_to_uv(position);
+                vec2 height_normal = get_gap(uv, gap, gap) * 10.0;
+                float height_length = length(normal.xz);
+                vec3 new_normal = normal + vec3(normal.z, 0.0, -normal.x) * height_normal.x + vec3(0.0, height_length, 0.0) * height_normal.y;
+                return normalize(new_normal);
+            }
+
+            float get_light_normal_dot(vec3 light, vec3 origin_normal, vec3 modified_normal) {
+                float origin = dot(light, origin_normal);
+                float modified = dot(light, modified_normal);
+                float mixed = origin > 0.0 ? modified : mix(modified, origin, 1.0 - pow(1.0 + origin, 3.0));
+                return mixed;
+            }
+
+            float is_snow(float height, vec2 uv) {
+                float snow = 0.999;
+                float snow_bottom = 0.15;
+                float result = 0.0;
+                result = max(height > snow ? 1.0 : result, result);
+                result = max(uv.y < snow_bottom ? 1.0 : result, result);
+                return height < 0.0 ? 0.0 : result;
+            }
+
+            float is_ground(float height, vec2 uv) {
+                float ground = 0.0;
+                return height > ground ? 1.0 : 0.0;
+            }
+
             void main() {
-                float h = get_height(fPosition.xyz);
-                vec4 pos = fPosition + fPosition * h * 0.25;
-                vec3 L = normalize((lightPosition.w == 0.0 ? lightPosition : lightPosition - pos).xyz);
+                vec3 L = normalize(lightPosition);
                 vec3 E = normalize(eyePosition);
                 vec3 H = normalize(L + E);
-                vec3 N = get_normal(pos.xyz, fNormal.xyz);
+                vec3 N = applyNormal > 0.5 ? get_modified_normal(fPosition.xyz, fNormal.xyz) : fNormal.xyz;
 
-                vec4 ambient = h > -0.1 ? groundAmbientProduct : waterAmbientProduct;
-                vec4 diffuse = max(dot(L, N), 0.0) * (h > -0.1 ? groundDiffuseProduct : waterDiffuseProduct);
-                vec4 specular = dot(L, N) < 0.0 ? vec4(0.0, 0.0, 0.0, 1.0) : pow(max(dot(N, H), 0.0), h > -0.1 ? groundShininess : waterShininess)
-                * (h > -0.1 ? groundSpecularProduct : waterSpecularProduct);
+                vec2 uv = position_to_uv(fPosition.xyz);
+                float lnd = get_light_normal_dot(L, fNormal.xyz, N);
+                float h = get_height(fPosition.xyz);
+                float snow = is_snow(h, uv);
+                float ground = is_ground(h, uv);
 
-                vec4 fColor = ambient + diffuse + specular;
+                vec4 targetDiffuse = mix(mix(waterDiffuseProduct, groundDiffuseProduct, ground), snowDiffuseProduct, snow);
+                vec4 targetSpecular = mix(mix(waterSpecularProduct, groundSpecularProduct, ground), snowSpecularProduct, snow);
+                float targetShininess = mix(mix(waterShininess, groundShininess, ground), snowShininess, snow);
+
+                vec4 diffuse = max(lnd, 0.0) * targetDiffuse;
+                vec4 specular = lnd < 0.0 
+                                ? vec4(0.0, 0.0, 0.0, 1.0) 
+                                : pow(max(dot(N, H), 0.0), targetShininess) * targetSpecular;
+
+                vec4 fColor = diffuse + specular;
                 fColor.a = 1.0;
 
                 gl_FragColor = fColor;
@@ -104,10 +166,61 @@
         <script type="text/javascript" src="Earth.js"></script>
     </head>
     <body>
-        <canvas id="gl-canvas" width="1024" height="1024
-        ">
-            Oops ... your browser doesn't support the HTML5 canvas element
-        </canvas>
+        <div class="container">
+            <canvas id="gl-canvas" width="1024" height="1024">
+                Oops ... your browser doesn't support the HTML5 canvas element
+            </canvas>
+            <div>
+                Eye
+                <div class="container">
+                    <div>
+                        Vertical
+                        <br>
+                        <input id="eyeVertical" type="range" min="-1.57" max="1.57" step="0.01" value="0.00"/>
+                    </div>
+                    <div>
+                        Horizontal
+                        <br>
+                        <input id="eyeHorizontal" type="range" min="0.00" max="6.28" step="0.01" value="0.00"/>
+                    </div>
+                </div>
+                <br>
+                Light
+                <div class="container">
+                    <div>
+                        Vertical
+                        <br>
+                        <input id="lightVertical" type="range" min="-3.14" max="3.14" step="0.01" value="0.00"/>
+                    </div>
+                    <div>
+                        Horizontal
+                        <br>
+                        <input id="lightHorizontal" type="range" min="0.00" max="6.28" step="0.01" value="0.00"/>
+                    </div>
+                </div>
+                <br>
+                <div>
+                    Height
+                    <br>
+                    <input id="height" type="range" min="0" max="0.05" step="0.005" value="0.01"/>
+                </div>
+                <br>
+                <div>
+                    Original Normal
+                    <input id="applyOriginalNormal" type="checkbox"/>
+                </div>
+                <div>
+                    Auto Rotation
+                    <input id="rotation" type="checkbox" checked/>
+                </div>
+            </div>
+        </div>
         <img id="heightMap" src="height_map.png" hidden>
+        <style>
+            .container {
+                display: flex;
+                gap: 12px;
+            }
+        </style>
     </body>
 </html>

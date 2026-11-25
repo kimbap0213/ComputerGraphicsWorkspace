@@ -10,37 +10,61 @@ var program;
 var vPosition;
 var vNormal;
 
-var lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
-var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0);
 var lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
 var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
-var waterMaterialAmbient = vec4(0.0, 0.0, 0.5, 1.0);
 var waterMaterialDiffuse = vec4(0.25, 0.25, 0.75, 1.0);
 var waterMaterialSpecular = vec4(0.5, 0.5, 1.0, 1.0);
 var waterMaterialShininess = 10.0;
 
-// var groundMaterialAmbient = vec4(0.15, 0.05, 0.05, 1.0);
-// var groundMaterialDiffuse = vec4(0.5, 0.25, 0.25, 1.0);
-// var groundMaterialSpecular = vec4(0.5, 0.35, 0.35, 1.0);
-var groundMaterialAmbient = vec4(0.05, 0.15, 0.05, 1.0);
-var groundMaterialDiffuse = vec4(0.25, 0.5, 0.25, 1.0);
-var groundMaterialSpecular = vec4(0.35, 0.5, 0.35, 1.0);
-var groundMaterialShininess = 1.0;
+var groundMaterialDiffuse = vec4(0.05, 0.15, 0.05, 1.0);
+var groundMaterialSpecular = vec4(0.05, 0.25, 0.05, 1.0);
+var groundMaterialShininess = 2.0;
+
+var snowMaterialDiffuse = vec4(0.75, 0.75, 0.75, 1.0);
+var snowMaterialSpecular = vec4(0.8, 0.8, 0.8, 1.0);
+var snowMaterialShininess = 30.0;
 
 var ctm;
-var ambientColor, diffuseColor, specularColor;
+var diffuseColor, specularColor;
 
 var modelViewMatrix, projectionMatrix;
 var modelViewMatrixLoc, projectionMatrixLoc;
 
 var normalMatrix, normalMatrixLoc;
 
+var heightLoc, height = 0.01;
+var applyNormalLoc, applyNormal = 1.0;
+
+var light, lightLoc;
 var eye, eyeLoc;
 var at = vec3(0.0, 0.0, 0.0);
 var up = vec3(0.0, 1.0, 0.0);
 
 var elapsedTime = 0.0;
+var eyeRotation = vec2(0.0, 0.0);
+var lightRotation = vec2(0.0, 0.0);
+
+var autoRotation = true;
+
+function updateEyePosition() {
+    var horizontalCos = Math.cos(eyeRotation[0] + elapsedTime);
+    var horizontalSin = Math.sin(eyeRotation[0] + elapsedTime);
+    var verticalCos = Math.cos(eyeRotation[1]);
+    var verticalSin = Math.sin(eyeRotation[1]);
+
+    eye = vec3(verticalCos * horizontalCos, verticalSin, verticalCos * horizontalSin);
+    up = vec3(-verticalSin * horizontalCos, verticalCos, -verticalSin * horizontalSin);
+}
+
+function updateLightPosition() {
+    var horizontalCos = Math.cos(lightRotation[0]);
+    var horizontalSin = Math.sin(lightRotation[0]);
+    var verticalCos = Math.cos(lightRotation[1]);
+    var verticalSin = Math.sin(lightRotation[1]);
+
+    light = vec3(verticalCos * horizontalCos, verticalSin, verticalCos * horizontalSin);
+}
 
 window.onload = function init() {
 
@@ -58,16 +82,17 @@ window.onload = function init() {
     program = initShaders(gl, "vertex-shader", "fragment-shader");
     gl.useProgram(program);
 
-    var waterAmbientProduct = mult(lightAmbient, waterMaterialAmbient);
     var waterDiffuseProduct = mult(lightDiffuse, waterMaterialDiffuse);
     var waterSpecularProduct = mult(lightSpecular, waterMaterialSpecular);
 
-    var groundAmbientProduct = mult(lightAmbient, groundMaterialAmbient);
     var groundDiffuseProduct = mult(lightDiffuse, groundMaterialDiffuse);
     var groundSpecularProduct = mult(lightSpecular, groundMaterialSpecular);
 
+    var snowDiffuseProduct = mult(lightDiffuse, snowMaterialDiffuse);
+    var snowSpecularProduct = mult(lightSpecular, snowMaterialSpecular);
+
     setHeightMap();
-    setEarthModel(50);
+    setEarthModel(100);
 
     var normalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
@@ -88,21 +113,58 @@ window.onload = function init() {
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
     projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
     normalMatrixLoc = gl.getUniformLocation(program, "normalMatrix");
+    lightLoc = gl.getUniformLocation(program, "lightPosition");
     eyeLoc = gl.getUniformLocation(program, "eyePosition");
 
-    gl.uniform4fv(gl.getUniformLocation(program, "waterAmbientProduct"), flatten(waterAmbientProduct));
     gl.uniform4fv(gl.getUniformLocation(program, "waterDiffuseProduct"), flatten(waterDiffuseProduct));
     gl.uniform4fv(gl.getUniformLocation(program, "waterSpecularProduct"), flatten(waterSpecularProduct));
     gl.uniform1f(gl.getUniformLocation(program, "waterShininess"), waterMaterialShininess);
 
-    gl.uniform4fv(gl.getUniformLocation(program, "groundAmbientProduct"), flatten(groundAmbientProduct));
     gl.uniform4fv(gl.getUniformLocation(program, "groundDiffuseProduct"), flatten(groundDiffuseProduct));
     gl.uniform4fv(gl.getUniformLocation(program, "groundSpecularProduct"), flatten(groundSpecularProduct));
     gl.uniform1f(gl.getUniformLocation(program, "groundShininess"), groundMaterialShininess);
 
-    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform4fv(gl.getUniformLocation(program, "snowDiffuseProduct"), flatten(snowDiffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "snowSpecularProduct"), flatten(snowSpecularProduct));
+    gl.uniform1f(gl.getUniformLocation(program, "snowShininess"), snowMaterialShininess);
 
+    heightLoc = gl.getUniformLocation(program, "heightScale");
+    applyNormalLoc = gl.getUniformLocation(program, "applyNormal");
+
+    addEvent();
     render();
+}
+
+function addEvent() {
+    var eyeHorizontal = document.getElementById("eyeHorizontal");
+    var eyeVertical = document.getElementById("eyeVertical");
+    var lightHorizontal = document.getElementById("lightHorizontal");
+    var lightVertical = document.getElementById("lightVertical");
+    var heightSlide = document.getElementById("height");
+    var normalCheck = document.getElementById("applyOriginalNormal");
+    var rotationCheck = document.getElementById("rotation");
+
+    eyeHorizontal.addEventListener('input', (e) => {
+        eyeRotation[0] = e.target.valueAsNumber;
+    })
+    eyeVertical.addEventListener('input', (e) => {
+        eyeRotation[1] = e.target.valueAsNumber;
+    })
+    lightHorizontal.addEventListener('input', (e) => {
+        lightRotation[0] = e.target.valueAsNumber;
+    })
+    lightVertical.addEventListener('input', (e) => {
+        lightRotation[1] = e.target.valueAsNumber;
+    })
+    heightSlide.addEventListener('input', (e) => {
+        height = e.target.valueAsNumber;
+    })
+    normalCheck.addEventListener('change', (e) => {
+        applyNormal = e.target.checked ? 0.0 : 1.0;
+    })
+    rotationCheck.addEventListener('change', (e) => {
+        autoRotation = e.target.checked;
+    })
 }
 
 function setHeightMap() {
@@ -112,8 +174,8 @@ function setHeightMap() {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, heightMap);
     gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.uniform1i(gl.getUniformLocation(program, "height"), 0);
-    console.log(heightMap);
 }
 
 function setVertex(a, b, c) {
@@ -174,7 +236,8 @@ function setEarthModel(divide) {
 function render() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    eye = vec3(Math.cos(elapsedTime), 0.0, Math.sin(elapsedTime));
+    updateEyePosition();
+    updateLightPosition();
 
     modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = ortho(-2.0, 2.0, -2.0, 2.0, -5.0, 5.0);
@@ -188,12 +251,18 @@ function render() {
     gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
     gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
     gl.uniformMatrix3fv(normalMatrixLoc, false, flatten(normalMatrix));
+    gl.uniform3fv(lightLoc, flatten(light));
     gl.uniform3fv(eyeLoc, flatten(eye));
+    gl.uniform1f(heightLoc, height);
+    gl.uniform1f(applyNormalLoc, applyNormal);
 
     for (let i = 0; i < points.length; i += 3) {
         gl.drawArrays(gl.TRIANGLES, i, 3);
     }
 
-    elapsedTime += 0.05;
+    if (autoRotation) {
+        elapsedTime += 0.01;
+    }
+
     requestAnimationFrame(render);
 }
