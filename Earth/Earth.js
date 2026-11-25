@@ -17,12 +17,15 @@ var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
 var waterMaterialAmbient = vec4(0.0, 0.0, 0.5, 1.0);
 var waterMaterialDiffuse = vec4(0.25, 0.25, 0.75, 1.0);
-var waterMaterialSpecular = vec4(1.0, 1.0, 1.0, 1.0);
+var waterMaterialSpecular = vec4(0.5, 0.5, 1.0, 1.0);
 var waterMaterialShininess = 10.0;
 
-var groundMaterialAmbient = vec4(0.15, 0.05, 0.05, 1.0);
-var groundMaterialDiffuse = vec4(0.75, 0.25, 0.25, 1.0);
-var groundMaterialSpecular = vec4(0.85, 0.35, 0.35, 1.0);
+// var groundMaterialAmbient = vec4(0.15, 0.05, 0.05, 1.0);
+// var groundMaterialDiffuse = vec4(0.5, 0.25, 0.25, 1.0);
+// var groundMaterialSpecular = vec4(0.5, 0.35, 0.35, 1.0);
+var groundMaterialAmbient = vec4(0.05, 0.15, 0.05, 1.0);
+var groundMaterialDiffuse = vec4(0.25, 0.5, 0.25, 1.0);
+var groundMaterialSpecular = vec4(0.35, 0.5, 0.35, 1.0);
 var groundMaterialShininess = 1.0;
 
 var ctm;
@@ -63,14 +66,14 @@ window.onload = function init() {
     var groundDiffuseProduct = mult(lightDiffuse, groundMaterialDiffuse);
     var groundSpecularProduct = mult(lightSpecular, groundMaterialSpecular);
 
-    setEarthModel(20);
+    setHeightMap();
+    setEarthModel(50);
 
     var normalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
 
     vNormal = gl.getAttribLocation(program, "vNormal");
-    console.log(vNormal);
     gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vNormal);
 
@@ -98,8 +101,6 @@ window.onload = function init() {
     gl.uniform1f(gl.getUniformLocation(program, "groundShininess"), groundMaterialShininess);
 
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
-
-    setHeightMap();
 
     render();
 }
@@ -193,6 +194,6 @@ function render() {
         gl.drawArrays(gl.TRIANGLES, i, 3);
     }
 
-    elapsedTime += 0.005;
+    elapsedTime += 0.05;
     requestAnimationFrame(render);
 }
