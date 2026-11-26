@@ -45,6 +45,8 @@ var lightRotation = vec2(0.0, 0.0);
 
 var autoRotation = true;
 
+const heightMap = new Image();
+
 function updateEyePosition() {
     var horizontalCos = Math.cos(eyeRotation[0] + elapsedTime);
     var horizontalSin = Math.sin(eyeRotation[0] + elapsedTime);
@@ -64,8 +66,7 @@ function updateLightPosition() {
     light = vec3(verticalCos * horizontalCos, verticalSin, verticalCos * horizontalSin);
 }
 
-window.onload = function init() {
-
+function init() {
     canvas = document.getElementById("gl-canvas");
 
     gl = WebGLUtils.setupWebGL(canvas);
@@ -121,6 +122,18 @@ window.onload = function init() {
     render();
 }
 
+window.onload = function loadImage() {
+
+    heightMap.src = 'https://raw.githubusercontent.com/kimbap0213/ComputerGraphicsWorkspace/refs/heads/main/Earth/height_map.png';
+    heightMap.crossOrigin = 'anonymous';
+
+    heightMap.addEventListener('load', () => {
+        init();
+    });
+
+
+}
+
 function addEvent() {
     var eyeHorizontal = document.getElementById("eyeHorizontal");
     var eyeVertical = document.getElementById("eyeVertical");
@@ -158,7 +171,7 @@ function addEvent() {
 }
 
 function setHeightMap() {
-    var heightMap = document.getElementById("heightMap");
+    // var heightMap = document.getElementById("heightMap");
     var texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
