@@ -7,8 +7,9 @@ var points = [];
 var normals = [];
 
 var program;
-var vPosition;
-var vNormal;
+
+var normalBuffer, vertexBuffer;
+var vPosition, vNormal;
 
 var lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
 var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
@@ -25,13 +26,10 @@ var snowMaterialDiffuse = vec4(0.75, 0.75, 0.75, 1.0);
 var snowMaterialSpecular = vec4(0.8, 0.8, 0.8, 1.0);
 var snowMaterialShininess = 30.0;
 
-var ctm;
 var diffuseColor, specularColor;
 
 var modelViewMatrix, projectionMatrix;
 var modelViewMatrixLoc, projectionMatrixLoc;
-
-var normalMatrix, normalMatrixLoc;
 
 var heightLoc, height = 0.01;
 var applyNormalLoc, applyNormal = 1.0;
@@ -91,30 +89,18 @@ window.onload = function init() {
     var snowDiffuseProduct = mult(lightDiffuse, snowMaterialDiffuse);
     var snowSpecularProduct = mult(lightSpecular, snowMaterialSpecular);
 
-    setHeightMap();
-    setEarthModel(100);
-
-    var normalBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
+    normalBuffer = gl.createBuffer();
+    vertexBuffer = gl.createBuffer();
 
     vNormal = gl.getAttribLocation(program, "vNormal");
-    gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vNormal);
-
-    var vertexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
-
     vPosition = gl.getAttribLocation(program, "vPosition");
-    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vPosition);
 
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
     projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
-    normalMatrixLoc = gl.getUniformLocation(program, "normalMatrix");
     lightLoc = gl.getUniformLocation(program, "lightPosition");
     eyeLoc = gl.getUniformLocation(program, "eyePosition");
+    heightLoc = gl.getUniformLocation(program, "heightScale");
+    applyNormalLoc = gl.getUniformLocation(program, "applyNormal");
 
     gl.uniform4fv(gl.getUniformLocation(program, "waterDiffuseProduct"), flatten(waterDiffuseProduct));
     gl.uniform4fv(gl.getUniformLocation(program, "waterSpecularProduct"), flatten(waterSpecularProduct));
@@ -128,8 +114,8 @@ window.onload = function init() {
     gl.uniform4fv(gl.getUniformLocation(program, "snowSpecularProduct"), flatten(snowSpecularProduct));
     gl.uniform1f(gl.getUniformLocation(program, "snowShininess"), snowMaterialShininess);
 
-    heightLoc = gl.getUniformLocation(program, "heightScale");
-    applyNormalLoc = gl.getUniformLocation(program, "applyNormal");
+    setHeightMap();
+    setEarthModel(50);
 
     addEvent();
     render();
@@ -141,6 +127,7 @@ function addEvent() {
     var lightHorizontal = document.getElementById("lightHorizontal");
     var lightVertical = document.getElementById("lightVertical");
     var heightSlide = document.getElementById("height");
+    var quantity = document.getElementById("quantity");
     var normalCheck = document.getElementById("applyOriginalNormal");
     var rotationCheck = document.getElementById("rotation");
 
@@ -158,6 +145,9 @@ function addEvent() {
     })
     heightSlide.addEventListener('input', (e) => {
         height = e.target.valueAsNumber;
+    })
+    quantity.addEventListener('input', (e) => {
+        setEarthModel(e.target.valueAsNumber);
     })
     normalCheck.addEventListener('change', (e) => {
         applyNormal = e.target.checked ? 0.0 : 1.0;
@@ -231,6 +221,18 @@ function setEarthModel(divide) {
     for (let i = 0; i < divide; i++) {
         setVertex(before[i % divide], bottom, before[(i + 1) % divide]);
     }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
+
+    gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW);
+
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
 }
 
 function render() {
@@ -242,15 +244,8 @@ function render() {
     modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = ortho(-2.0, 2.0, -2.0, 2.0, -5.0, 5.0);
 
-    normalMatrix = [
-        vec3(modelViewMatrix[0][0], modelViewMatrix[0][1], modelViewMatrix[0][2]),
-        vec3(modelViewMatrix[1][0], modelViewMatrix[1][1], modelViewMatrix[1][2]),
-        vec3(modelViewMatrix[2][0], modelViewMatrix[2][1], modelViewMatrix[2][2]),
-    ];
-
     gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
     gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
-    gl.uniformMatrix3fv(normalMatrixLoc, false, flatten(normalMatrix));
     gl.uniform3fv(lightLoc, flatten(light));
     gl.uniform3fv(eyeLoc, flatten(eye));
     gl.uniform1f(heightLoc, height);

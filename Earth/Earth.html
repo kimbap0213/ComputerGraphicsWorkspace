@@ -62,8 +62,6 @@
             uniform vec4 snowSpecularProduct;
             uniform float snowShininess;
 
-            uniform mat3 normalMatrix;
-
             uniform vec3 lightPosition;
             uniform vec3 eyePosition;
 
@@ -106,7 +104,7 @@
             vec3 get_modified_normal(vec3 position, vec3 normal) {
                 float gap = 3.0 / 4096.0;
                 vec2 uv = position_to_uv(position);
-                vec2 height_normal = get_gap(uv, gap, gap) * 10.0;
+                vec2 height_normal = get_gap(uv, gap, gap) * 25.0;
                 float height_length = length(normal.xz);
                 vec3 new_normal = normal + vec3(normal.z, 0.0, -normal.x) * height_normal.x + vec3(0.0, height_length, 0.0) * height_normal.y;
                 return normalize(new_normal);
@@ -149,7 +147,7 @@
                 vec4 targetSpecular = mix(mix(waterSpecularProduct, groundSpecularProduct, ground), snowSpecularProduct, snow);
                 float targetShininess = mix(mix(waterShininess, groundShininess, ground), snowShininess, snow);
 
-                vec4 diffuse = max(lnd, 0.0) * targetDiffuse;
+                vec4 diffuse = max(lnd, 0.1) * targetDiffuse;
                 vec4 specular = lnd < 0.0 
                                 ? vec4(0.0, 0.0, 0.0, 1.0) 
                                 : pow(max(dot(N, H), 0.0), targetShininess) * targetSpecular;
@@ -203,6 +201,12 @@
                     Height
                     <br>
                     <input id="height" type="range" min="0" max="0.05" step="0.005" value="0.01"/>
+                </div>
+                <br>
+                <div>
+                    Sphere Vertex Quantity
+                    <br>
+                    <input id="quantity" type="range" min="10" max="100" step="10" value="50"/>
                 </div>
                 <br>
                 <div>
