@@ -67,6 +67,8 @@
 
             uniform sampler2D height;
             uniform float applyNormal;
+            uniform float applyTexture;
+            uniform float applyShading;
 
             varying vec4 fPosition;
             varying vec4 fNormal;
@@ -147,6 +149,9 @@
                 vec4 targetSpecular = mix(mix(waterSpecularProduct, groundSpecularProduct, ground), snowSpecularProduct, snow);
                 float targetShininess = mix(mix(waterShininess, groundShininess, ground), snowShininess, snow);
 
+                targetDiffuse = applyTexture > 0.5 ? texture2D(height, uv) : targetDiffuse;
+                targetSpecular = applyTexture > 0.5 ? vec4(0.0, 0.0, 0.0, 1.0)  : targetDiffuse;
+
                 vec4 diffuse = max(lnd, 0.1) * targetDiffuse;
                 vec4 specular = lnd < 0.0 
                                 ? vec4(0.0, 0.0, 0.0, 1.0) 
@@ -154,6 +159,8 @@
 
                 vec4 fColor = diffuse + specular;
                 fColor.a = 1.0;
+
+                fColor = applyShading > 0.5 ? fColor : targetDiffuse;
 
                 gl_FragColor = fColor;
             }
@@ -169,7 +176,7 @@
                 Oops ... your browser doesn't support the HTML5 canvas element
             </canvas>
             <div>
-                Eye
+                <b>Eye</b>
                 <div class="container">
                     <div>
                         Vertical
@@ -182,8 +189,8 @@
                         <input id="eyeHorizontal" type="range" min="0.00" max="6.28" step="0.01" value="0.00"/>
                     </div>
                 </div>
-                <br>
-                Light
+                <hr>
+                <b>Light</b>
                 <div class="container">
                     <div>
                         Vertical
@@ -196,26 +203,49 @@
                         <input id="lightHorizontal" type="range" min="0.00" max="6.28" step="0.01" value="0.00"/>
                     </div>
                 </div>
-                <br>
-                <div>
-                    Height
-                    <br>
-                    <input id="height" type="range" min="0" max="0.05" step="0.005" value="0.01"/>
+                <hr>
+                <b>Rotation Speed</b>
+                <div class="container">
+                    <div>
+                        Earth
+                        <br>
+                        <input id="earthSpeed" type="range" min="0.0" max="0.1" step="0.01" value="0.01"/>
+                    </div>
+                    <div>
+                        Light
+                        <br>
+                        <input id="lightSpeed" type="range" min="0.0" max="0.1" step="0.01" value="0.01"/>
+                    </div>
                 </div>
-                <br>
-                <div>
-                    Sphere Vertex Quantity
-                    <br>
-                    <input id="quantity" type="range" min="10" max="100" step="10" value="50"/>
+                <hr>
+                <b>Modeling</b>
+                <div class="container">
+                    <div>
+                        Vertex Height
+                        <br>
+                        <input id="height" type="range" min="0" max="0.05" step="0.005" value="0.01"/>
+                    </div>
+                    <div>
+                        Vertex Quantity
+                        <br>
+                        <input id="quantity" type="range" min="10" max="100" step="10" value="50"/>
+                    </div>
                 </div>
-                <br>
-                <div>
-                    Original Normal
-                    <input id="applyOriginalNormal" type="checkbox"/>
-                </div>
-                <div>
-                    Auto Rotation
-                    <input id="rotation" type="checkbox" checked/>
+                <hr>
+                <b>Extra Option</b>
+                <div class="container">
+                    <div>
+                        Original Normal
+                        <input id="applyOriginalNormal" type="checkbox"/>
+                    </div>
+                    <div>
+                        Original Texture
+                        <input id="applyOriginalTexture" type="checkbox"/>
+                    </div>
+                    <div>
+                        Enable Shading
+                        <input id="applyShading" type="checkbox" checked/>
+                    </div>
                 </div>
             </div>
         </div>
